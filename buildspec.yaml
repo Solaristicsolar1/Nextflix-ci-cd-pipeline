@@ -32,4 +32,5 @@ artifacts:
     - '**/*'
   base-directory: "./"
   name: build-artifact-name
+  type: zip
   discard-paths: no
