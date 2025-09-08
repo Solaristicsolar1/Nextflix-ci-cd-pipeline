@@ -1,185 +1,211 @@
-# AWS DevOps CICD Pipeline
+# Netflix Clone - AWS CI/CD Pipeline with ECR
 
-In This Project, we are Developing and Deploying a video streaming application on EC2 using Docker and AWS Developers Tools.
+Deploy a Netflix clone React application on EC2 using Docker, ECR, and AWS DevOps tools.
 
-* `Github`: For Source Code Management
+## Architecture
 
-* `CodeBuild`: For building and testing our code in a serverless fashion
+**GitHub** → **CodeBuild** → **ECR** → **CodePipeline** → **CodeDeploy** → **EC2 Auto Scaling Group**
 
-* `CodeDeploy`: To deploy our code
+## AWS Services Used
 
-* `CodePipeline`: To streamline the CI/CD pipeline
+- **GitHub**: Source code management
+- **CodeBuild**: Build and containerize application
+- **ECR**: Docker image repository
+- **CodePipeline**: CI/CD orchestration
+- **CodeDeploy**: Application deployment
+- **Systems Manager**: Parameter storage
+- **IAM**: Service roles and permissions
+- **S3**: Build artifacts storage
+- **EC2**: Application hosting
+- **Auto Scaling Group**: High availability
+- **Application Load Balancer**: Traffic distribution
 
-* `System Manager`: To store Parameters
+## Prerequisites
 
-* `DockerHub`: To store Docker Images in a Repository
+1. **TMDB API Key**: Get from [The Movie Database](https://www.themoviedb.org/)
+2. **AWS Account** with appropriate permissions
+3. **GitHub Repository** with your Netflix clone code
 
-* `Identity and Access Management` (IAM) for creating a Service Role
+## Setup Instructions
 
-* `S3` for artifact storing
+### 1. Create IAM Roles
 
-* `EC2` for Deployment
-
-Clone this Repository
-
-```elixir
-git clone https://github.com/OjoOluwagbenga700/Netflix-Clone--aws-cicd-pipeline-on-ec2.git
+**EC2 Role:**
+```
+Role Name: EC2CodeDeployRole
+Trusted Entity: EC2
+Policies: 
+- AmazonEC2RoleforAWSCodeDeploy
+- AmazonEC2ContainerRegistryReadOnly
+- AmazonSSMManagedInstanceCore
 ```
 
-# **Project Architecture**
-
-# **draw your architecture here**
-
-
-### 1. IAM Role Configuration
-
-#### EC2 Role
-1. Create a new role with EC2 as trusted entity
-2. Attach `AmazonEC2RoleforAWSCodeDeploy` policy
-3. Name the role (e.g., `EC2CodeDeployRole`)
-
-#### CodeDeploy Role
-1. Create a new role with CodeDeploy as trusted entity
-2. Attach `AWSCodeDeployRole` policy
-4. Update trust relationship with provided policy
-
-### 2. Launch Template and ASG setup
-
-1. Use Ubuntu or Amazon linux  EC2 instance for Launch Template
-2. Configure security group (SSH: Port 22, HTTP: Port 80)
-3. Attach EC2CodeDeployRole
-4. Add CodeDeploy agent installation script to user data
-5. Create autoscaling group from the launch template
-6. Create loadbalancer and target group as part of the autoscalling group.
-
-### UserData (ensure you change region to your current region for the codedeploy agent)
-* For `Amazon Linux`
-```yaml
-#!/bin/bash
-sudo yum -y update
-sudo yum install -y docker
-sudo service docker start
-sudo usermod -aG docker ec2-user
-sudo yum -y install ruby
-sudo yum -y install wget
-cd /home/ec2-user
-wget https://aws-codedeploy-ap-south-1.s3.ap-south-1.amazonaws.com/latest/install
-sudo chmod +x ./install
-sudo ./install auto
+**CodeDeploy Role:**
+```
+Role Name: CodeDeployServiceRole
+Trusted Entity: CodeDeploy
+Policies:
+- AWSCodeDeployRole
 ```
 
-* For `Ubuntu`
-```yaml
+### 2. Create ECR Repository
+
+```bash
+aws ecr create-repository --repository-name netflix-clone --region us-east-1
+```
+
+### 3. Store Parameters in Systems Manager
+
+Create these parameters in **Parameter Store**:
+
+| Parameter Name | Type | Value |
+|---|---|---|
+| `/myapp/ecr/repository-uri` | String | `YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/netflix-clone` |
+| `/ecr/api/key` | SecureString | Your TMDB API Key |
+
+### 4. Create Launch Template
+
+**AMI**: Ubuntu 22.04 LTS
+**Instance Type**: t3.micro (or larger)
+**Security Group**: Allow SSH (22) and HTTP (80)
+**IAM Role**: EC2CodeDeployRole
+
+**User Data:**
+```bash
 #!/bin/bash
 sudo apt update
-sudo install docker.io
-sudo apt install ruby-full
-wget cd /home/ubuntu wget https://aws-codedeploy-ap-south-1.s3.ap-south-1.amazonaws.com/latest/install
+sudo apt install -y docker.io ruby-full wget unzip
+sudo systemctl start docker
+sudo usermod -aG docker ubuntu
+cd /home/ubuntu
+wget https://aws-codedeploy-us-east-1.s3.us-east-1.amazonaws.com/latest/install
 chmod +x ./install
 sudo ./install auto
-sudo service codedeploy-agent status
+sudo systemctl start codedeploy-agent
 ```
 
-* In this project, we will build and push a Docker image to the DockerHub repository.
+### 5. Create Auto Scaling Group
 
-* So, We need DockerHub credentials like `Username` and `Password`.
+- **Launch Template**: Use the template created above
+- **Desired Capacity**: 2
+- **Min**: 1, Max: 4
+- **Target Group**: Create new (HTTP:80)
+- **Load Balancer**: Application Load Balancer
 
-* Also, we are using a free API to consume movie/TV data in this Project. [TMDB](https://www.themoviedb.org/).
-* Click on the TMDB link , create and account and get your API Key (TMDB API key)
+### 6. Create CodeBuild Project
 
-* # **Using** `AWS System Manager` for storing secrets
+**Project Configuration:**
+- **Source**: GitHub (your repository)
+- **Environment**: Ubuntu, Standard runtime
+- **Service Role**: Create new (will auto-attach required policies)
+- **Buildspec**: Use `buildspec.yaml` in repository root
+- **Artifacts**: S3 bucket for storing build outputs
+- **Privileged Mode**: ✅ Enable (required for Docker builds)
 
-* Goto `AWS System Manager` dashboard.
+**Additional Permissions:**
+Add `AmazonEC2ContainerRegistryPowerUser` policy to CodeBuild service role.
 
-* Click on `Parameter Store` -&gt; `Create parameter`
+### 7. Create CodeDeploy Application
 
-* In Parameter details
+**Application Configuration:**
+- **Application Name**: netflix-app
+- **Compute Platform**: EC2/On-premises
+- **Service Role**: CodeDeployServiceRole
 
-***Add*** `DockerHub Username`
+**Deployment Group:**
+- **Deployment Group Name**: netflix-deployment-group
+- **Service Role**: CodeDeployServiceRole
+- **Environment Configuration**: Amazon EC2 Auto Scaling groups
+- **Auto Scaling Group**: Select your ASG
+- **Load Balancer**: Enable load balancing
 
-*Name:* `/myapp/docker-credentials/username`
+### 8. Create CodePipeline
 
-*Type:* `SecureString`
+**Pipeline Configuration:**
+- **Pipeline Name**: netflix-cicd-pipeline
+- **Service Role**: Create new
 
-*Value: Add Your DockerHub Username*
+**Source Stage:**
+- **Provider**: GitHub (Version 2)
+- **Repository**: Your Netflix clone repository
+- **Branch**: main
+- **Change Detection**: ✅ Start pipeline on source code change
 
-***Add*** `DockerHub Password`
+**Build Stage:**
+- **Provider**: AWS CodeBuild
+- **Project**: Your CodeBuild project
+- **Build Type**: Single build
 
-*Name:* `/myapp/docker-credentials/password`
+**Deploy Stage:**
+- **Provider**: AWS CodeDeploy
+- **Application**: netflix-app
+- **Deployment Group**: netflix-deployment-group
 
-*Type:* `SecureString`
+## Project Files
 
-*Value: Add Your DockerHub Password or secret token*
+### buildspec.yaml
+Defines the build process:
+- Installs Node.js dependencies
+- Builds Docker image with TMDB API key
+- Pushes image to ECR
+- Creates deployment artifacts
 
-***Add*** `TMDB API Key`
+### appspec.yml
+Defines deployment process:
+- Stops existing application
+- Starts new application
+- Validates deployment
 
-*Name:* `/ecr/api/key`
+### scripts/start.sh
+- Installs AWS CLI if needed
+- Pulls latest Docker image from ECR
+- Starts Netflix container on port 80
 
-*Type:* `SecureString`
+### scripts/stop.sh
+- Stops and removes existing Netflix container
+- Cleans up Docker images
 
-*Value: Add Your TMDB API key*
+## Deployment Process
 
-# **Setting Up CodeBuild**
+1. **Developer pushes code** to GitHub main branch
+2. **CodePipeline triggers** automatically
+3. **CodeBuild** builds Docker image and pushes to ECR
+4. **CodeDeploy** deploys to EC2 Auto Scaling Group
+5. **EC2 instances** pull image from ECR and start containers
+6. **Load Balancer** distributes traffic to healthy instances
 
-* Click on `Create build project`
+## Access Your Application
 
-* Follow the steps
+After successful deployment, access your Netflix clone at:
+```
+http://YOUR_LOAD_BALANCER_DNS_NAME
+```
 
-* CodeBuild will need `buildspec.yml` to build a project.
-  
-* Add source - Github
-  
-* Add Artifact - S3 ( create s3 bucket)
+## Monitoring
 
-* The `buildspec.yml` file is in the repository root folder.
+- **CodePipeline**: Monitor pipeline execution
+- **CodeBuild**: View build logs and status
+- **CodeDeploy**: Track deployment progress
+- **EC2**: Monitor instance health
+- **Load Balancer**: Check target group health
 
-* Also, This project will containerize so that select the `Enable this flag if you want to build Docker images or want your builds to get elevated privileges.`
+## Troubleshooting
 
-* Also, Add Permission in CodeBuild Created Role to assess `Parameters from CodeBuild to System Manager`
+**Common Issues:**
+- Ensure ECR repository URI is correct in Parameter Store
+- Verify IAM roles have required permissions
+- Check CodeDeploy agent is running on EC2 instances
+- Confirm security groups allow HTTP traffic on port 80
 
-* For this, Attach `AmazonSSMManagedInstanceCore `policy to the codebuild created role
+## Clean Up
 
-
-# **DockerHub Repository**
-
-* Just for Test
-
-* `Pull` this Docker Image locally using `docker run -n netflix -p 8080:80 your-dockehub-username/netflix-react-app`
-
-![](https://miro.medium.com/v2/resize:fit:802/1*84WPkjw5a1ddu8QS7Brx7g.png)
-
-# **Create CodeDeploy Application**
-
-* Create Application and Compute platform is EC2/On-premises
-  
-* Add Service role (codedeployrole created above)
-  
-* Create CodeDeploy Group
-  
-* select  Amazon EC2 autoscaling group under environmnent configuration
-
-* Click On `Create Deployment` to `Start Deployment`
-
-
-# **Create CodePipeline**
-
-* Step 1: Choose pipeline setting -&gt; PipelineName &gt; Service role
-
-* Step 2: Add source stage -&gt; Github &gt; RepoName &gt; BranchName &gt; Select CodePipeline periodically for changes(For automation)
-
-* Step 3: Add build stage -&gt; BuildProvider &gt; Region &gt; ProjectName &gt; Single build
-
-* Step 4: Add deploy stage -&gt; DeployProvider &gt; Region &gt; AppName &gt; Deployment group
-
-* Step 5: Review
-
-
-
-# **Output**
-
-Check your output from the DNS endpoint of your loadbalancer
-
-![](https://miro.medium.com/v2/resize:fit:1146/1*AXXMABbwjT5zFi5zibzP5A.png)
-
-
-# Netflix-Clone--aws-cicd-pipeline-on-ec2-asg
+To avoid charges, delete resources in this order:
+1. CodePipeline
+2. CodeDeploy Application
+3. CodeBuild Project
+4. Auto Scaling Group
+5. Load Balancer
+6. Launch Template
+7. ECR Repository
+8. IAM Roles
+9. Parameter Store parameters
