@@ -35,4 +35,3 @@ artifacts:
   files:
     - appspec.yml
     - scripts/**/*
-  name: netflix-app-$(date +%Y-%m-%d)
