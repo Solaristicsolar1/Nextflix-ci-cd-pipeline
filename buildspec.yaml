@@ -2,11 +2,9 @@ version: 0.2
 
 env:
   parameter-store:
-    USERNAME: /myapp/docker-credentials/username
-    PASSWORD: /myapp/docker-credentials/password
-    KEY:  /myapp/api/key
+    ECR_REPOSITORY_URI: netflix-clone
+    KEY: /ecr/api/key
 
-        
 phases:
   install:
     runtime-versions:
@@ -21,15 +19,14 @@ phases:
       - echo "dependencies installed"
   build:
     commands:
-      - docker build . -t $USERNAME/netflix-react-app:latest --build-arg TMDB_V3_API_KEY=$KEY
+      - docker build . -t $ECR_REPOSITORY_URI:latest --build-arg TMDB_V3_API_KEY=$KEY
   post_build:
     commands:
-      - echo "waiting right now"
-      - docker login -u $USERNAME -p $PASSWORD
-      - docker push $USERNAME/netflix-react-app:latest
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI
+      - docker push $ECR_REPOSITORY_URI:latest
 artifacts:
   files:
-    - '**/*'
+    - "**/*"
   base-directory: "./"
   name: build-artifact-name
   type: zip
