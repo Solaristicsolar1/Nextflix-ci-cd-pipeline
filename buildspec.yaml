@@ -5,7 +5,7 @@ env:
     ECR_REPOSITORY_URI: /myapp/ecr/repository-uri
     TMDB_API_KEY: /ecr/api/key
   variables:
-    AWS_DEFAULT_REGION: us-east-1 # region for ECR login
+    AWS_DEFAULT_REGION: us-east-1
 
 phases:
   install:
