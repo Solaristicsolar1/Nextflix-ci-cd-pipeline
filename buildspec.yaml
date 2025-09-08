@@ -30,7 +30,6 @@ phases:
       - echo "Pushing image to ECR: $ECR_REPOSITORY_URI:latest"
       - docker push $ECR_REPOSITORY_URI:latest
       - echo "Docker push completed"
-      # Create a clean output directory for deployment bundle
       - mkdir -p output
       - cp appspec.yml output/
       - cp -r scripts/ output/
