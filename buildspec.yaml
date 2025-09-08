@@ -18,8 +18,8 @@ phases:
     commands:
       - npm install
       - echo "Dependencies installed"
-      - echo "ECR Repository URI: $ECR_REPOSITORY_URI"
-      - "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI"
+      - echo "ECR Repository URI is $ECR_REPOSITORY_URI"
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI
       - echo "ECR login successful"
   build:
     commands:
@@ -27,7 +27,7 @@ phases:
       - echo "Docker build completed"
   post_build:
     commands:
-      - echo "Pushing image to ECR: $ECR_REPOSITORY_URI:latest"
+      - echo "Pushing image to ECR"
       - docker push $ECR_REPOSITORY_URI:latest
       - echo "Docker push completed"
 
