@@ -30,13 +30,9 @@ phases:
       - echo "Pushing image to ECR"
       - docker push $ECR_REPOSITORY_URI:latest
       - echo "Docker push completed"
-      - echo "Creating zip artifact"
-      - ls -la
-      - zip -r deployment-artifact.zip . -x "node_modules/*" ".git/*" "*.zip"
-      - ls -la *.zip
 
 artifacts:
   files:
-    - deployment-artifact.zip
-    - "**/*"
-  name: build-artifacts
+    - appspec.yml
+    - scripts/**/*
+  name: netflix-app-$(date +%Y-%m-%d)
