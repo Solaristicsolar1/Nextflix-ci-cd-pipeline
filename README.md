@@ -113,7 +113,7 @@ sudo service codedeploy-agent status
 
 ***Add*** `TMDB API Key`
 
-*Name:* `/myapp/api/key`
+*Name:* `/ecr/api/key`
 
 *Type:* `SecureString`
 

@@ -2,8 +2,8 @@ version: 0.2
 
 env:
   parameter-store:
-    ECR_REPOSITORY_URI: netflix-clone
-    KEY: /ecr/api/key
+    ECR_REPOSITORY_URI: /myapp/ecr/repository-uri
+    TMDB_API_KEY: /ecr/api/key
 
 phases:
   install:
@@ -11,19 +11,25 @@ phases:
       nodejs: latest
     commands:
       - node --version
-      - echo "installed node "
-    # steps:
+      - echo "installed node"
   pre_build:
     commands:
       - npm install
       - echo "dependencies installed"
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI
   build:
     commands:
-      - docker build . -t $ECR_REPOSITORY_URI:latest --build-arg TMDB_V3_API_KEY=$KEY
+      - docker build . -t $ECR_REPOSITORY_URI:latest --build-arg TMDB_V3_API_KEY=$TMDB_API_KEY
   post_build:
     commands:
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI
       - docker push $ECR_REPOSITORY_URI:latest
+artifacts:
+  files:
+    - "**/*"
+  base-directory: "./"
+  name: build-artifact-name
+  type: zip
+  discard-paths: no
 artifacts:
   files:
     - "**/*"
