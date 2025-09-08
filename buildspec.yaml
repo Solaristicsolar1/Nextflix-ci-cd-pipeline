@@ -4,6 +4,8 @@ env:
   parameter-store:
     ECR_REPOSITORY_URI: /myapp/ecr/repository-uri
     TMDB_API_KEY: /ecr/api/key
+  variables:
+    AWS_DEFAULT_REGION: us-east-1 # region for ECR login
 
 phases:
   install:
@@ -11,29 +13,31 @@ phases:
       nodejs: latest
     commands:
       - node --version
-      - echo "installed node"
+      - echo "Node installed"
   pre_build:
     commands:
       - npm install
-      - echo "dependencies installed"
+      - echo "Dependencies installed"
+      - echo "ECR Repository URI: $ECR_REPOSITORY_URI"
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPOSITORY_URI
+      - echo "ECR login successful"
   build:
     commands:
       - docker build . -t $ECR_REPOSITORY_URI:latest --build-arg TMDB_V3_API_KEY=$TMDB_API_KEY
+      - echo "Docker build completed"
   post_build:
     commands:
+      - echo "Pushing image to ECR: $ECR_REPOSITORY_URI:latest"
       - docker push $ECR_REPOSITORY_URI:latest
+      - echo "Docker push completed"
+      # Create a clean output directory for deployment bundle
+      - mkdir -p output
+      - cp appspec.yml output/
+      - cp -r scripts/ output/
+      - cd output && zip -r ../deployment-package.zip . && cd ..
+      - echo "Deployment package created: deployment-package.zip"
+
 artifacts:
   files:
-    - "**/*"
-  base-directory: "./"
-  name: build-artifact-name
-  type: zip
-  discard-paths: no
-artifacts:
-  files:
-    - "**/*"
-  base-directory: "./"
-  name: build-artifact-name
-  type: zip
+    - deployment-package.zip
   discard-paths: no
